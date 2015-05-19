@@ -6,8 +6,8 @@ This example provides web-based access to a DiddyBorg or DiddyBorg Metal Edition
 The interface streams images from the Raspberry Pi camera, movement can be controlled from the buttons.
 
 It is intended for use with:
-* (DiddyBorg Metal Edition)[https://www.piborg.org/diddyborg/metaledition]
-* (DiddyBorg)[https://www.piborg.org/diddyborg]
+* [DiddyBorg Metal Edition](https://www.piborg.org/diddyborg/metaledition)
+* [DiddyBorg](https://www.piborg.org/diddyborg)
 
 ## Getting ready
 Before using this script you should make sure your DiddyBorg is working with the standard examples.
@@ -18,8 +18,8 @@ You will not need the option joystick setup for this example.
 You will probably want to use a WiFi dongle for the best results.
 Make sure your WiFi is working and connected to you router before running the scripts.
 
-(DiddyBorg Metal Edition setup instructions)[https://www.piborg.org/diddyborg/metaledition/install]
-(DiddyBorg setup instructions)[https://www.piborg.org/diddyborg/install]
+* [DiddyBorg Metal Edition setup instructions](https://www.piborg.org/diddyborg/metaledition/install)
+* [DiddyBorg setup instructions](https://www.piborg.org/diddyborg/install)
 
 ## Downloading the code
 To get the code we will clone this repository to the Raspberry Pi.
@@ -38,8 +38,8 @@ It should be 4 numbers separated by dots, e.g. `192.168.0.198`
 We will need this to access the controls, so make a note of it.
 
 Next run the script for your robot:
-DiddyBorg Metal Edition - `sudo ~/diddyborg-web/metalWeb.py`
-DiddyBorg - `sudo ~/diddyborg-web/diddyWeb.py`
+* DiddyBorg Metal Edition - `sudo ~/diddyborg-web/metalWeb.py`
+* DiddyBorg - `sudo ~/diddyborg-web/diddyWeb.py`
 
 Wait for the script to load, when it is ready it should say:
 `Press CTRL+C to terminate the web-server`
@@ -66,6 +66,17 @@ There are some settings towards the top of the script which may be changed to ad
 * `imageHeight` - The height of the captured camera image, higher will need more network bandwidth
 * `frameRate` - The number of images taken from the camera each second by the Raspberry Pi
 * `displayRate` - The number of times per second the web browser will refresh the camera image
+
+## Auto start at boot
+To get the web interface to load on its own do the following:
+1. Open the Cron table using `crontab -e`
+2. Add a cron job to the bottom of the file using one of the following lines:
+** DiddyBorg Metal Edition → `@reboot /home/pi/diddyborg-web/metalWeb.py`
+** DiddyBorg → `@reboot /home/pi/diddyborg-web/diddyWeb.py`
+3. Save the file
+4. Close the file
+
+The cron table should now auto-run the script when the Raspberry Pi boots up.
 
 ## Going further
 This is just a simple example of how a web interface can be made using Python on the Raspberry Pi to control a robot.
