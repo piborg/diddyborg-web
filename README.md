@@ -69,6 +69,7 @@ There are some settings towards the top of the script which may be changed to ad
 
 ## Auto start at boot
 To get the web interface to load on its own do the following:
+
 1. Open the Cron table using `crontab -e`
 2. Add a cron job to the bottom of the file using one of the following lines:
   * DiddyBorg Metal Edition → `@reboot /home/pi/diddyborg-web/metalWeb.py`
