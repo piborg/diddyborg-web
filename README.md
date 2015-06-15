@@ -27,7 +27,6 @@ In a terminal run the following commands
 ```bash
 cd ~
 git clone https://github.com/piborg/diddyborg-web.git
-chmod +x diddyborg-web/*.py
 ```
 
 ## Running the code
