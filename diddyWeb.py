@@ -12,6 +12,7 @@ import SocketServer
 import picamera
 import picamera.array
 import cv2
+import datetime
 
 # Settings for the web-page
 webPort = 80                            # Port number for the web-page, 80 is what web-pages normally use
@@ -67,7 +68,7 @@ class Watchdog(threading.Thread):
         self.terminated = False
         self.start()
         self.timestamp = time.time()
-        
+
     def run(self):
         timedOut = True
         # This method runs in a separate thread
@@ -214,8 +215,27 @@ class WebServer(SocketServer.BaseRequestHandler):
             driveRight *= maxPower
             PBR.SetMotor1(driveRight)
             PBR.SetMotor2(-driveLeft)
+        elif getPath.startswith('/photo'):
+            # Save camera photo
+            lockFrame.acquire()
+            captureFrame = lastFrame
+            lockFrame.release()
+            httpText = '<html><body><center>'
+            if captureFrame != None:
+                photoName = '~/Photo %s.jpg' % (datetime.datetime.utcnow())
+                try:
+                    photoFile = open(photoName, 'wb')
+                    photoFile.write(captureFrame)
+                    photoFile.close()
+                    httpText += 'Photo saved to %s' % (photoName)
+                except:
+                    httpText += 'Failed to take photo!'
+            else:
+                httpText += 'Failed to take photo!'
+            httpText += '</center></body></html>'
+            self.send(httpText)
         elif getPath == '/':
-            # Main page
+            # Main page, click buttons to move and to stop
             httpText = '<html>\n'
             httpText += '<head>\n'
             httpText += '<script language="JavaScript"><!--\n'
@@ -229,6 +249,10 @@ class WebServer(SocketServer.BaseRequestHandler):
             httpText += 'function Off() {\n'
             httpText += ' var iframe = document.getElementById("setDrive");\n'
             httpText += ' iframe.src = "/off";\n'
+            httpText += '}\n'
+            httpText += 'function Photo() {\n'
+            httpText += ' var iframe = document.getElementById("setDrive");\n'
+            httpText += ' iframe.src = "/photo";\n'
             httpText += '}\n'
             httpText += '//--></script>\n'
             httpText += '</head>\n'
@@ -245,6 +269,49 @@ class WebServer(SocketServer.BaseRequestHandler):
             httpText += '<button onclick="Drive(1,0)" style="width:200px;height:100px;"><b>Turn Right</b></button>\n'
             httpText += '<br /><br />\n'
             httpText += '<button onclick="Off()" style="width:200px;height:100px;"><b>Stop</b></button>\n'
+            httpText += '<br /><br />\n'
+            httpText += '<button onclick="Photo()" style="width:200px;height:100px;"><b>Save Photo</b></button>\n'
+            httpText += '<br /><br />\n'
+            httpText += '<input id="speed" type="range" min="0" max="100" value="100" style="width:600px" />\n'
+            httpText += '</center>\n'
+            httpText += '</body>\n'
+            httpText += '</html>\n'
+            self.send(httpText)
+        elif getPath == '/hold':
+            # Alternate page, hold buttons to move (does not work with all devices)
+            httpText = '<html>\n'
+            httpText += '<head>\n'
+            httpText += '<script language="JavaScript"><!--\n'
+            httpText += 'function Drive(left, right) {\n'
+            httpText += ' var iframe = document.getElementById("setDrive");\n'
+            httpText += ' var slider = document.getElementById("speed");\n'
+            httpText += ' left *= speed.value / 100.0;'
+            httpText += ' right *= speed.value / 100.0;'
+            httpText += ' iframe.src = "/set/" + left + "/" + right;\n'
+            httpText += '}\n'
+            httpText += 'function Off() {\n'
+            httpText += ' var iframe = document.getElementById("setDrive");\n'
+            httpText += ' iframe.src = "/off";\n'
+            httpText += '}\n'
+            httpText += 'function Photo() {\n'
+            httpText += ' var iframe = document.getElementById("setDrive");\n'
+            httpText += ' iframe.src = "/photo";\n'
+            httpText += '}\n'
+            httpText += '//--></script>\n'
+            httpText += '</head>\n'
+            httpText += '<body>\n'
+            httpText += '<iframe src="/stream" width="100%" height="500" frameborder="0"></iframe>\n'
+            httpText += '<iframe id="setDrive" src="/off" width="100%" height="50" frameborder="0"></iframe>\n'
+            httpText += '<center>\n'
+            httpText += '<button onmousedown="Drive(-1,1)" onmouseup="Off()" style="width:200px;height:100px;"><b>Spin Left</b></button>\n'
+            httpText += '<button onmousedown="Drive(1,1)" onmouseup="Off()" style="width:200px;height:100px;"><b>Forward</b></button>\n'
+            httpText += '<button onmousedown="Drive(1,-1)" onmouseup="Off()" style="width:200px;height:100px;"><b>Spin Right</b></button>\n'
+            httpText += '<br /><br />\n'
+            httpText += '<button onmousedown="Drive(0,1)" onmouseup="Off()" style="width:200px;height:100px;"><b>Turn Left</b></button>\n'
+            httpText += '<button onmousedown="Drive(-1,-1)" onmouseup="Off()" style="width:200px;height:100px;"><b>Reverse</b></button>\n'
+            httpText += '<button onmousedown="Drive(1,0)" onmouseup="Off()" style="width:200px;height:100px;"><b>Turn Right</b></button>\n'
+            httpText += '<br /><br />\n'
+            httpText += '<button onclick="Photo()" style="width:200px;height:100px;"><b>Save Photo</b></button>\n'
             httpText += '<br /><br />\n'
             httpText += '<input id="speed" type="range" min="0" max="100" value="100" style="width:600px" />\n'
             httpText += '</center>\n'
