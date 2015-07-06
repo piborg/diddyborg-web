@@ -4,6 +4,7 @@ Web based interface for controlling DiddyBorg from a phone or browser.
 
 This example provides web-based access to a DiddyBorg or DiddyBorg Metal Edition using a web browser on both phones and desktops.
 The interface streams images from the Raspberry Pi camera, movement can be controlled from the buttons.
+
 Additionally the current image may be saved to the SD card with a button press.
 
 It is intended for use with:
@@ -62,10 +63,10 @@ The last motor settings are displayed below the image.
 ## Alternative options
 There are some other URLs you can use to get different functionality.
 Replace `192.168.0.198` in the below addresses with your IP address:
-* (http://192.168.0.198) - Standard controls, click to change speed
-* (http://192.168.0.198/hold) - Press and hold controls, may not work on all devices
-* (http://192.168.0.198/stream) - Gets the video stream without any controls
-* (http://192.168.0.198/cam.jpg) - Single frame from the camera, you may need to force-refresh to get a new image
+* http://192.168.0.198 - Standard controls, click to change speed
+* http://192.168.0.198/hold - Press and hold controls, may not work on all devices
+* http://192.168.0.198/stream - Gets the video stream without any controls
+* http://192.168.0.198/cam.jpg - Single frame from the camera, you may need to force-refresh to get a new image
 
 ## Additional settings
 There are some settings towards the top of the script which may be changed to adjust the behaviour of the interface:
