@@ -20,6 +20,7 @@ imageWidth = 240                        # Width of the captured image in pixels
 imageHeight = 180                       # Height of the captured image in pixels
 frameRate = 10                          # Number of images to capture per second
 displayRate = 2                         # Number of images to request per second
+photoDirectory = '/home/pi'             # Directory to save photos to
 
 # Global values
 global PBR
@@ -222,7 +223,7 @@ class WebServer(SocketServer.BaseRequestHandler):
             lockFrame.release()
             httpText = '<html><body><center>'
             if captureFrame != None:
-                photoName = '~/Photo %s.jpg' % (datetime.datetime.utcnow())
+                photoName = '%s/Photo %s.jpg' % (photoDirectory, datetime.datetime.utcnow())
                 try:
                     photoFile = open(photoName, 'wb')
                     photoFile.write(captureFrame)
