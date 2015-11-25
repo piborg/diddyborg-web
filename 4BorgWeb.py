@@ -214,8 +214,8 @@ class WebServer(SocketServer.BaseRequestHandler):
             # Set the outputs
             driveLeft *= maxPower
             driveRight *= maxPower
-            PBR.SetMotor1(-driveRight)
-            PBR.SetMotor2(driveLeft)
+            PBR.SetMotor1(-driveLeft)
+            PBR.SetMotor2(driveRight)
         elif getPath.startswith('/photo'):
             # Save camera photo
             lockFrame.acquire()
