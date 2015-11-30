@@ -9,7 +9,9 @@ Additionally the current image may be saved to the SD card with a button press.
 
 It is intended for use with:
 * [DiddyBorg Metal Edition](https://www.piborg.org/diddyborg/metaledition)
+* [DiddyBorg Red Edition](https://www.piborg.org/diddyborg/rededition)
 * [DiddyBorg](https://www.piborg.org/diddyborg)
+* [4Borg](https://www.piborg.org/4Borg)
 
 ## Getting ready
 Before using this script you should make sure your DiddyBorg is working with the standard examples.
@@ -21,7 +23,9 @@ You will probably want to use a WiFi dongle for the best results.
 Make sure your WiFi is working and connected to you router before running the scripts.
 
 * [DiddyBorg Metal Edition setup instructions](https://www.piborg.org/diddyborg/metaledition/install)
+* [DiddyBorg Red Edition setup instructions](https://www.piborg.org/diddyborg/rededition/install)
 * [DiddyBorg setup instructions](https://www.piborg.org/diddyborg/install)
+* [4Borg setup instructions](https://www.piborg.org/4Borg/install)
 
 ## Downloading the code
 To get the code we will clone this repository to the Raspberry Pi.
@@ -39,8 +43,10 @@ It should be 4 numbers separated by dots, e.g. `192.168.0.198`
 We will need this to access the controls, so make a note of it.
 
 Next run the script for your robot:
-* DiddyBorg Metal Edition - `sudo ~/diddyborg-web/metalWeb.py`
-* DiddyBorg - `sudo ~/diddyborg-web/diddyWeb.py`
+* DiddyBorg Metal Edition → `sudo ~/diddyborg-web/metalWeb.py`
+* DiddyBorg Red Edition → `sudo ~/diddyborg-web/diddyRedWeb.py`
+* DiddyBorg → `sudo ~/diddyborg-web/diddyWeb.py`
+* 4Borg → `sudo ~/diddyborg-web/4BorgWeb.py`
 
 Wait for the script to load, when it is ready it should say:
 `Press CTRL+C to terminate the web-server`
@@ -83,7 +89,9 @@ To get the web interface to load on its own do the following:
 1. Open the Cron table using `crontab -e`
 2. Add a cron job to the bottom of the file using one of the following lines:
   * DiddyBorg Metal Edition → `@reboot /home/pi/diddyborg-web/metalWeb.py`
+  * DiddyBorg Red Edition → `@reboot /home/pi/diddyborg-web/diddyRedWeb.py`
   * DiddyBorg → `@reboot /home/pi/diddyborg-web/diddyWeb.py`
+  * 4Borg → `@reboot /home/pi/diddyborg-web/4BorgWeb.py`
 3. Save the file
 4. Close the file
 
