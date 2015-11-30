@@ -88,10 +88,10 @@ To get the web interface to load on its own do the following:
 
 1. Open the Cron table using `crontab -e`
 2. Add a cron job to the bottom of the file using one of the following lines:
-  * DiddyBorg Metal Edition → `@reboot /home/pi/diddyborg-web/metalWeb.py`
-  * DiddyBorg Red Edition → `@reboot /home/pi/diddyborg-web/diddyRedWeb.py`
-  * DiddyBorg → `@reboot /home/pi/diddyborg-web/diddyWeb.py`
-  * 4Borg → `@reboot /home/pi/diddyborg-web/4BorgWeb.py`
+  * DiddyBorg Metal Edition → `@reboot sudo /home/pi/diddyborg-web/metalWeb.py`
+  * DiddyBorg Red Edition → `@reboot sudo /home/pi/diddyborg-web/diddyRedWeb.py`
+  * DiddyBorg → `@reboot sudo /home/pi/diddyborg-web/diddyWeb.py`
+  * 4Borg → `@reboot sudo /home/pi/diddyborg-web/4BorgWeb.py`
 3. Save the file
 4. Close the file
 
