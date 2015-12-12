@@ -21,21 +21,22 @@ imageHeight = 180                       # Height of the captured image in pixels
 frameRate = 10                          # Number of images to capture per second
 displayRate = 2                         # Number of images to request per second
 photoDirectory = '/home/pi'             # Directory to save photos to
+timeout = 5
 
 # Global values
 global PBR
 global lastFrame
 global lockFrame
-global camera
-global processor
 global running
 global watchdog
-running = True
+global captureThread
+running = False
 
 # Setup the PicoBorg Reverse
 PBR = PicoBorgRev.PicoBorgRev()
 #PBR.i2cAddress = 0x44                  # Uncomment and change the value if you have changed the board address
 PBR.Init()
+
 if not PBR.foundChip:
     boards = PicoBorgRev.ScanForPicoBorgReverse()
     if len(boards) == 0:
@@ -71,28 +72,34 @@ class Watchdog(threading.Thread):
         self.timestamp = time.time()
 
     def run(self):
+        global running
         timedOut = True
         # This method runs in a separate thread
         while not self.terminated:
             # Wait for a network event to be flagged for up to one second
             if timedOut:
-                if self.event.wait(1):
+                if self.event.wait(timeout):
                     # Connection
-                    print 'Reconnected...'
+                    print('Connected...')
                     timedOut = False
+                    running = True
+                    captureThread = ImageCapture()
                     self.event.clear()
             else:
-                if self.event.wait(1):
+                if self.event.wait(timeout):
                     self.event.clear()
                 else:
                     # Timed out
-                    print 'Timed out...'
+                    print('Timed out...')
                     timedOut = True
+                    running = False
+                    print("Shutting down: Stopping captureThread")
+                    captureThread.join()
                     PBR.MotorsOff()
 
 # Image stream processing thread
 class StreamProcessor(threading.Thread):
-    def __init__(self):
+    def __init__(self, camera):
         super(StreamProcessor, self).__init__()
         self.stream = picamera.array.PiRGBArray(camera)
         self.event = threading.Event()
@@ -129,24 +136,29 @@ class ImageCapture(threading.Thread):
         self.start()
 
     def run(self):
-        global camera
-        global processor
-        print 'Start the stream using the video port'
-        camera.capture_sequence(self.TriggerStream(), format='bgr', use_video_port=True)
-        print 'Terminating camera processing...'
-        processor.terminated = True
-        processor.join()
+        print 'Setup camera'
+        with picamera.PiCamera() as camera:
+            camera.resolution = (imageWidth, imageHeight)
+            camera.framerate = frameRate
+            print 'Setup the stream processing thread'
+            self.processor = StreamProcessor(camera)
+            print 'Start the stream using the video port'
+            camera.capture_sequence(self.TriggerStream(), format='bgr', use_video_port=True)
+            print 'Terminating camera processing...'
+            self.processor.terminated = True
+            self.processor.join()
+
         print 'Processing terminated.'
 
     # Stream delegation loop
     def TriggerStream(self):
         global running
         while running:
-            if processor.event.is_set():
+            if self.processor.event.is_set():
                 time.sleep(0.01)
             else:
-                yield processor.stream
-                processor.event.set()
+                yield self.processor.stream
+                self.processor.event.set()
 
 # Class used to implement the web server
 class WebServer(SocketServer.BaseRequestHandler):
@@ -350,26 +362,15 @@ lastFrame = None
 lockFrame = threading.Lock()
 
 # Startup sequence
-print 'Setup camera'
-camera = picamera.PiCamera()
-camera.resolution = (imageWidth, imageHeight)
-camera.framerate = frameRate
-
-print 'Setup the stream processing thread'
-processor = StreamProcessor()
-
-print 'Wait ...'
-time.sleep(2)
-captureThread = ImageCapture()
-
 print 'Setup the watchdog'
 watchdog = Watchdog()
 
-# Run the web server until we are told to close
-httpServer = SocketServer.TCPServer(("0.0.0.0", webPort), WebServer)
 try:
+    # Run the web server until we are told to close
+    httpServer = SocketServer.TCPServer(("0.0.0.0", webPort), WebServer)
+
     print 'Press CTRL+C to terminate the web-server'
-    while running:
+    while True:
         httpServer.handle_request()
 except KeyboardInterrupt:
     # CTRL+C exit
@@ -378,13 +379,9 @@ finally:
     # Turn the motors off under all scenarios
     PBR.MotorsOff()
     print 'Motors off'
-# Tell each thread to stop, and wait for them to end
-running = False
-captureThread.join()
-processor.terminated = True
-watchdog.terminated = True
-processor.join()
-watchdog.join()
-del camera
-PBR.SetLed(True)
-print 'Web-server terminated.'
+
+    watchdog.terminated = True
+    print("Shutting down: Stopping watchdog")
+    watchdog.join()
+    PBR.SetLed(True)
+    print('Web-server terminated.')
