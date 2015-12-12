@@ -21,7 +21,8 @@ imageHeight = 180                       # Height of the captured image in pixels
 frameRate = 10                          # Number of images to capture per second
 displayRate = 2                         # Number of images to request per second
 photoDirectory = '/home/pi'             # Directory to save photos to
-timeout = 5
+timeout = 5                             # Length of inactivity after which the camera is turned off in seconds
+
 
 # Global values
 global PBR
@@ -62,7 +63,7 @@ if voltageOut > voltageIn:
 else:
     maxPower = voltageOut / float(voltageIn)
 
-# Timeout thread
+# Timeout thread which judges if a client is currently watching the stream
 class Watchdog(threading.Thread):
     def __init__(self):
         super(Watchdog, self).__init__()
@@ -82,6 +83,7 @@ class Watchdog(threading.Thread):
                     # Connection
                     print('Connected...')
                     timedOut = False
+                    # Connected to a client so start the camera thread
                     running = True
                     captureThread = ImageCapture()
                     self.event.clear()
@@ -92,6 +94,7 @@ class Watchdog(threading.Thread):
                     # Timed out
                     print('Timed out...')
                     timedOut = True
+                    # All clients have disconnected so turn off the camera
                     running = False
                     print("Shutting down: Stopping captureThread")
                     captureThread.join()
