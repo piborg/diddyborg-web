@@ -12,6 +12,7 @@ It is intended for use with:
 * [DiddyBorg Red Edition](https://www.piborg.org/diddyborg/rededition)
 * [DiddyBorg](https://www.piborg.org/diddyborg)
 * [4Borg](https://www.piborg.org/4Borg)
+* [YetiBorg](https://www.piborg.org/yetiborg)
 
 ## Getting ready
 Before using this script you should make sure your DiddyBorg is working with the standard examples.
@@ -26,6 +27,7 @@ Make sure your WiFi is working and connected to you router before running the sc
 * [DiddyBorg Red Edition setup instructions](https://www.piborg.org/diddyborg/rededition/install)
 * [DiddyBorg setup instructions](https://www.piborg.org/diddyborg/install)
 * [4Borg setup instructions](https://www.piborg.org/4Borg/install)
+* [YetiBorg setup instructions](https://www.piborg.org/yetiborg/install)
 
 ## Downloading the code
 To get the code we will clone this repository to the Raspberry Pi.
@@ -47,6 +49,7 @@ Next run the script for your robot:
 * DiddyBorg Red Edition → `sudo ~/diddyborg-web/diddyRedWeb.py`
 * DiddyBorg → `sudo ~/diddyborg-web/diddyWeb.py`
 * 4Borg → `sudo ~/diddyborg-web/4BorgWeb.py`
+* YetiBorg → `sudo ~/diddyborg-web/yetiWeb.py`
 
 Wait for the script to load, when it is ready it should say:
 `Press CTRL+C to terminate the web-server`
@@ -92,6 +95,7 @@ To get the web interface to load on its own do the following:
   * DiddyBorg Red Edition → `@reboot sudo /home/pi/diddyborg-web/diddyRedWeb.py`
   * DiddyBorg → `@reboot sudo /home/pi/diddyborg-web/diddyWeb.py`
   * 4Borg → `@reboot sudo /home/pi/diddyborg-web/4BorgWeb.py`
+  * 4Borg → `@reboot sudo /home/pi/diddyborg-web/yetiWeb.py`
 3. Save the file
 4. Close the file
 
