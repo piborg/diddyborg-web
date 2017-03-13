@@ -1,13 +1,14 @@
 # diddyborg-web
-Web based interface for controlling DiddyBorg from a phone or browser.
+Web based interface for controlling MonsterBorgs or DiddyBorgs from a phone or browser.
 ![](screenshot.png?raw=true)
 
-This example provides web-based access to a DiddyBorg or DiddyBorg Metal Edition using a web browser on both phones and desktops.
+This example provides web-based access to a MonsterBorg, DiddyBorg, or DiddyBorg Metal Edition using a web browser on both phones and desktops.
 The interface streams images from the Raspberry Pi camera, movement can be controlled from the buttons.
 
 Additionally the current image may be saved to the SD card with a button press.
 
 It is intended for use with:
+* [MonsterBorg](https://www.kickstarter.com/projects/frobotics/monsterborg-the-raspberry-pi-monster-robot/?ref=webui)
 * [DiddyBorg Metal Edition](https://www.piborg.org/diddyborg/metaledition)
 * [DiddyBorg Red Edition](https://www.piborg.org/diddyborg/rededition)
 * [DiddyBorg](https://www.piborg.org/diddyborg)
@@ -15,14 +16,15 @@ It is intended for use with:
 * [YetiBorg](https://www.piborg.org/yetiborg)
 
 ## Getting ready
-Before using this script you should make sure your DiddyBorg is working with the standard examples.
+Before using this script you should make sure your MonsterBorg or DiddyBorg is working with the standard examples.
 
 You will need to also perform the optional camera setup so the script can stream images.
-You will not need the option joystick setup for this example.
+You will not need the optional joystick setup for this example.
 
 You will probably want to use a WiFi dongle for the best results.
 Make sure your WiFi is working and connected to you router before running the scripts.
 
+* MonsterBorg setup instructions coming soon :)
 * [DiddyBorg Metal Edition setup instructions](https://www.piborg.org/diddyborg/metaledition/install)
 * [DiddyBorg Red Edition setup instructions](https://www.piborg.org/diddyborg/rededition/install)
 * [DiddyBorg setup instructions](https://www.piborg.org/diddyborg/install)
@@ -41,10 +43,11 @@ git clone https://github.com/piborg/diddyborg-web.git
 This is easiest done via SSH over the WiFi.
 
 First find out what your IP address is using the `ifconfig` command.
-It should be 4 numbers separated by dots, e.g. `192.168.0.198`
+It should be four numbers separated by dots, e.g. `192.168.0.198`
 We will need this to access the controls, so make a note of it.
 
 Next run the script for your robot:
+* MonsterBorg → `sudo ~/diddyborg-web/monsterWeb.py`
 * DiddyBorg Metal Edition → `sudo ~/diddyborg-web/metalWeb.py`
 * DiddyBorg Red Edition → `sudo ~/diddyborg-web/diddyRedWeb.py`
 * DiddyBorg → `sudo ~/diddyborg-web/diddyWeb.py`
@@ -53,6 +56,11 @@ Next run the script for your robot:
 
 Wait for the script to load, when it is ready it should say:
 `Press CTRL+C to terminate the web-server`
+
+With MonsterBorg the RGB led is used to show status:
+* Blue means we are waiting for a connection
+* Green/yellow/red is used for battery monitoring
+* Off means the script has finished
 
 ## Controlling your robot
 Load your web browser on your phone or desktop.
@@ -85,12 +93,16 @@ There are some settings towards the top of the script which may be changed to ad
 * `frameRate` - The number of images taken from the camera each second by the Raspberry Pi
 * `displayRate` - The number of times per second the web browser will refresh the camera image
 * `photoDirectory` - The directory that photos are saved to when taken
+There are some extra settings for the MonsterBorg version:
+* `flippedCamera` - Swap between `True` and `False` to rotate the camera display by 180 degrees
+* `jpegQuality` - Image quality between 0 and 100, lower numbers show images faster, higher numbers are better quality
 
 ## Auto start at boot
 To get the web interface to load on its own do the following:
 
 1. Open the Cron table using `crontab -e`
 2. Add a cron job to the bottom of the file using one of the following lines:
+  * MonsterBorg → `@reboot sudo /home/pi/diddyborg-web/monsterWeb.py`
   * DiddyBorg Metal Edition → `@reboot sudo /home/pi/diddyborg-web/metalWeb.py`
   * DiddyBorg Red Edition → `@reboot sudo /home/pi/diddyborg-web/diddyRedWeb.py`
   * DiddyBorg → `@reboot sudo /home/pi/diddyborg-web/diddyWeb.py`
