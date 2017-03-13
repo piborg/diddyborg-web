@@ -93,6 +93,7 @@ There are some settings towards the top of the script which may be changed to ad
 * `frameRate` - The number of images taken from the camera each second by the Raspberry Pi
 * `displayRate` - The number of times per second the web browser will refresh the camera image
 * `photoDirectory` - The directory that photos are saved to when taken
+
 There are some extra settings for the MonsterBorg version:
 * `flippedCamera` - Swap between `True` and `False` to rotate the camera display by 180 degrees
 * `jpegQuality` - Image quality between 0 and 100, lower numbers show images faster, higher numbers are better quality
