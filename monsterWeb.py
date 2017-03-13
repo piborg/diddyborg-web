@@ -53,7 +53,7 @@ TB.SetLedShowBattery(False)
 TB.SetLeds(0,0,1)
 
 # Power settings
-voltageIn = 1.2 * 10                    # Total battery voltage to the PicoBorg Reverse
+voltageIn = 1.2 * 10                    # Total battery voltage to the ThunderBorg
 voltageOut = 12.0 * 0.95                # Maximum motor voltage, we limit it to 95% to allow the RPi to get uninterrupted power
 
 # Setup the power limits
