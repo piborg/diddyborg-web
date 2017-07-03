@@ -27,11 +27,13 @@ See the website at www.piborg.org/thunderborg for more details
 """
 
 # Import the libraries we need
-import smbus
+import io
+import fcntl
 import types
 import time
 
 # Constant values
+I2C_SLAVE                   = 0x0703
 PWM_MAX                     = 255
 I2C_MAX_LEN                 = 6
 VOLTAGE_PIN_MAX             = 36.3  # Maximum voltage from the analog voltage monitoring pin
@@ -64,6 +66,7 @@ COMMAND_GET_FAILSAFE        = 20    # Get the failsafe flag
 COMMAND_GET_BATT_VOLT       = 21    # Get the battery voltage reading
 COMMAND_SET_BATT_LIMITS     = 22    # Set the battery monitoring limits
 COMMAND_GET_BATT_LIMITS     = 23    # Get the battery monitoring limits
+COMMAND_WRITE_EXTERNAL_LED  = 24    # Write a 32bit pattern out to SK9822 / APA102C
 COMMAND_GET_ID              = 0x99  # Get the board identifier
 COMMAND_SET_I2C_ADD         = 0xAA  # Set a new I2C address
 
@@ -85,10 +88,11 @@ The busNumber if supplied is which I²C bus to scan, 0 for Rev 1 boards, 1 for Re
     """
     found = []
     print 'Scanning I²C bus #%d' % (busNumber)
-    bus = smbus.SMBus(busNumber)
+    bus = ThunderBorg()
     for address in range(0x03, 0x78, 1):
         try:
-            i2cRecv = bus.read_i2c_block_data(address, COMMAND_GET_ID, I2C_MAX_LEN)
+            bus.InitBusOnly(busNumber, address)
+            i2cRecv = bus.RawRead(COMMAND_GET_ID, I2C_MAX_LEN)
             if len(i2cRecv) == I2C_MAX_LEN:
                 if i2cRecv[1] == I2C_ID_THUNDERBORG:
                     print 'Found ThunderBorg at %02X' % (address)
@@ -133,9 +137,10 @@ Warning, this new I²C address will still be used after resetting the power on th
         else:
             oldAddress = found[0]
     print 'Changing I²C address from %02X to %02X (bus #%d)' % (oldAddress, newAddress, busNumber)
-    bus = smbus.SMBus(busNumber)
+    bus = ThunderBorg()
+    bus.InitBusOnly(busNumber, oldAddress)
     try:
-        i2cRecv = bus.read_i2c_block_data(oldAddress, COMMAND_GET_ID, I2C_MAX_LEN)
+        i2cRecv = bus.RawRead(COMMAND_GET_ID, I2C_MAX_LEN)
         if len(i2cRecv) == I2C_MAX_LEN:
             if i2cRecv[1] == I2C_ID_THUNDERBORG:
                 foundChip = True
@@ -152,11 +157,12 @@ Warning, this new I²C address will still be used after resetting the power on th
         foundChip = False
         print 'Missing ThunderBorg at %02X' % (oldAddress)
     if foundChip:
-        bus.write_byte_data(oldAddress, COMMAND_SET_I2C_ADD, newAddress)
+        bus.RawWrite(COMMAND_SET_I2C_ADD, [newAddress])
         time.sleep(0.1)
         print 'Address changed to %02X, attempting to talk with the new address' % (newAddress)
         try:
-            i2cRecv = bus.read_i2c_block_data(newAddress, COMMAND_GET_ID, I2C_MAX_LEN)
+            bus.InitBusOnly(busNumber, newAddress)
+            i2cRecv = bus.RawRead(COMMAND_GET_ID, I2C_MAX_LEN)
             if len(i2cRecv) == I2C_MAX_LEN:
                 if i2cRecv[1] == I2C_ID_THUNDERBORG:
                     foundChip = True
@@ -193,9 +199,68 @@ printFunction           Function reference to call when printing text, if None "
     # Shared values used by this class
     busNumber               = 1                     # Check here for Rev 1 vs Rev 2 and select the correct bus
     i2cAddress              = I2C_ID_THUNDERBORG    # I²C address, override for a different address
-    bus                     = None
     foundChip               = False
     printFunction           = None
+    i2cWrite                = None
+    i2cRead                 = None
+
+
+    def RawWrite(self, command, data):
+        """
+RawWrite(command, data)
+
+Sends a raw command on the I2C bus to the ThunderBorg
+Command codes can be found at the top of ThunderBorg.py, data is a list of 0 or more byte values
+
+Under most circumstances you should use the appropriate function instead of RawWrite
+        """
+        rawOutput = chr(command)
+        for singleByte in data:
+            rawOutput += chr(singleByte)
+        self.i2cWrite.write(rawOutput)
+
+
+    def RawRead(self, command, length, retryCount = 3):
+        """
+RawRead(command, length, [retryCount])
+
+Reads data back from the ThunderBorg after sending a GET command
+Command codes can be found at the top of ThunderBorg.py, length is the number of bytes to read back
+
+The function checks that the first byte read back matches the requested command
+If it does not it will retry the request until retryCount is exhausted (default is 3 times)
+
+Under most circumstances you should use the appropriate function instead of RawRead
+        """
+        while retryCount > 0:
+            self.RawWrite(command, [])
+            rawReply = self.i2cRead.read(length)
+            reply = []
+            for singleByte in rawReply:
+                reply.append(ord(singleByte))
+            if command == reply[0]:
+                break
+            else:
+                retryCount -= 1
+        if retryCount > 0:
+            return reply
+        else:
+            raise IOError('I2C read for command %d failed' % (command))
+
+
+    def InitBusOnly(self, busNumber, address):
+        """
+InitBusOnly(busNumber, address)
+
+Prepare the I2C driver for talking to a ThunderBorg on the specified bus and I2C address
+This call does not check the board is present or working, under most circumstances use Init() instead
+        """
+        self.busNumber = busNumber
+        self.i2cAddress = address
+        self.i2cRead = io.open("/dev/i2c-" + str(self.busNumber), "rb", buffering = 0)
+        fcntl.ioctl(self.i2cRead, I2C_SLAVE, self.i2cAddress)
+        self.i2cWrite = io.open("/dev/i2c-" + str(self.busNumber), "wb", buffering = 0)
+        fcntl.ioctl(self.i2cWrite, I2C_SLAVE, self.i2cAddress)
 
 
     def Print(self, message):
@@ -233,11 +298,14 @@ If tryOtherBus is True, this function will attempt to use the other bus if the T
         self.Print('Loading ThunderBorg on bus %d, address %02X' % (self.busNumber, self.i2cAddress))
 
         # Open the bus
-        self.bus = smbus.SMBus(self.busNumber)
+        self.i2cRead = io.open("/dev/i2c-" + str(self.busNumber), "rb", buffering = 0)
+        fcntl.ioctl(self.i2cRead, I2C_SLAVE, self.i2cAddress)
+        self.i2cWrite = io.open("/dev/i2c-" + str(self.busNumber), "wb", buffering = 0)
+        fcntl.ioctl(self.i2cWrite, I2C_SLAVE, self.i2cAddress)
 
         # Check for ThunderBorg
         try:
-            i2cRecv = self.bus.read_i2c_block_data(self.i2cAddress, COMMAND_GET_ID, I2C_MAX_LEN)
+            i2cRecv = self.RawRead(COMMAND_GET_ID, I2C_MAX_LEN)
             if len(i2cRecv) == I2C_MAX_LEN:
                 if i2cRecv[1] == I2C_ID_THUNDERBORG:
                     self.foundChip = True
@@ -296,7 +364,7 @@ SetMotor2(1)     -> motor 2 moving forward at 100% power
                 pwm = PWM_MAX
 
         try:
-            self.bus.write_byte_data(self.i2cAddress, command, pwm)
+            self.RawWrite(command, [pwm])
         except KeyboardInterrupt:
             raise
         except:
@@ -315,7 +383,7 @@ e.g.
 1     -> motor 2 moving forward at 100% power
         """
         try:
-            i2cRecv = self.bus.read_i2c_block_data(self.i2cAddress, COMMAND_GET_B, I2C_MAX_LEN)
+            i2cRecv = self.RawRead(COMMAND_GET_B, I2C_MAX_LEN)
         except KeyboardInterrupt:
             raise
         except:
@@ -357,7 +425,7 @@ SetMotor1(1)     -> motor 1 moving forward at 100% power
                 pwm = PWM_MAX
 
         try:
-            self.bus.write_byte_data(self.i2cAddress, command, pwm)
+            self.RawWrite(command, [pwm])
         except KeyboardInterrupt:
             raise
         except:
@@ -376,7 +444,7 @@ e.g.
 1     -> motor 1 moving forward at 100% power
         """
         try:
-            i2cRecv = self.bus.read_i2c_block_data(self.i2cAddress, COMMAND_GET_A, I2C_MAX_LEN)
+            i2cRecv = self.RawRead(COMMAND_GET_A, I2C_MAX_LEN)
         except KeyboardInterrupt:
             raise
         except:
@@ -418,7 +486,7 @@ SetMotors(1)     -> all motors are moving forward at 100% power
                 pwm = PWM_MAX
 
         try:
-            self.bus.write_byte_data(self.i2cAddress, command, pwm)
+            self.RawWrite(command, [pwm])
         except KeyboardInterrupt:
             raise
         except:
@@ -432,7 +500,7 @@ MotorsOff()
 Sets all motors to stopped, useful when ending a program
         """
         try:
-            self.bus.write_byte_data(self.i2cAddress, COMMAND_ALL_OFF, 0)
+            self.RawWrite(COMMAND_ALL_OFF, [0])
         except KeyboardInterrupt:
             raise
         except:
@@ -455,7 +523,7 @@ SetLed1(0.2, 0.0, 0.2) -> ThunderBorg LED dull purple
         levelB = max(0, min(PWM_MAX, int(b * PWM_MAX)))
 
         try:
-            self.bus.write_i2c_block_data(self.i2cAddress, COMMAND_SET_LED1, [levelR, levelG, levelB])
+            self.RawWrite(COMMAND_SET_LED1, [levelR, levelG, levelB])
         except KeyboardInterrupt:
             raise
         except:
@@ -474,7 +542,7 @@ e.g.
 0.2, 0.0, 0.2 -> ThunderBorg LED dull purple
         """
         try:
-            i2cRecv = self.bus.read_i2c_block_data(self.i2cAddress, COMMAND_GET_LED1, I2C_MAX_LEN)
+            i2cRecv = self.RawRead(COMMAND_GET_LED1, I2C_MAX_LEN)
         except KeyboardInterrupt:
             raise
         except:
@@ -503,7 +571,7 @@ SetLed2(0.2, 0.0, 0.2) -> ThunderBorg Lid LED dull purple
         levelB = max(0, min(PWM_MAX, int(b * PWM_MAX)))
 
         try:
-            self.bus.write_i2c_block_data(self.i2cAddress, COMMAND_SET_LED2, [levelR, levelG, levelB])
+            self.RawWrite(COMMAND_SET_LED2, [levelR, levelG, levelB])
         except KeyboardInterrupt:
             raise
         except:
@@ -522,7 +590,7 @@ e.g.
 0.2, 0.0, 0.2 -> ThunderBorg Lid LED dull purple
         """
         try:
-            i2cRecv = self.bus.read_i2c_block_data(self.i2cAddress, COMMAND_GET_LED2, I2C_MAX_LEN)
+            i2cRecv = self.RawRead(COMMAND_GET_LED2, I2C_MAX_LEN)
         except KeyboardInterrupt:
             raise
         except:
@@ -551,7 +619,7 @@ SetLeds(0.2, 0.0, 0.2) -> Both LEDs dull purple
         levelB = max(0, min(PWM_MAX, int(b * PWM_MAX)))
 
         try:
-            self.bus.write_i2c_block_data(self.i2cAddress, COMMAND_SET_LEDS, [levelR, levelG, levelB])
+            self.RawWrite(COMMAND_SET_LEDS, [levelR, levelG, levelB])
         except KeyboardInterrupt:
             raise
         except:
@@ -572,7 +640,7 @@ This sweeps from fully green for maximum voltage (35 V) to fully red for minimum
             level = COMMAND_VALUE_OFF
 
         try:
-            self.bus.write_byte_data(self.i2cAddress, COMMAND_SET_LED_BATT_MON, level)
+            self.RawWrite(COMMAND_SET_LED_BATT_MON, [level])
         except KeyboardInterrupt:
             raise
         except:
@@ -588,7 +656,7 @@ If enabled the LED colours will be ignored and will use the current battery read
 This sweeps from fully green for maximum voltage (35 V) to fully red for minimum voltage (7 V)
         """ 
         try:
-            i2cRecv = self.bus.read_i2c_block_data(self.i2cAddress, COMMAND_GET_LED_BATT_MON, I2C_MAX_LEN)
+            i2cRecv = self.RawRead(COMMAND_GET_LED_BATT_MON, I2C_MAX_LEN)
         except KeyboardInterrupt:
             raise
         except:
@@ -616,7 +684,7 @@ The failsafe is disabled at power on
             level = COMMAND_VALUE_OFF
 
         try:
-            self.bus.write_byte_data(self.i2cAddress, COMMAND_SET_FAILSAFE, level)
+            self.RawWrite(COMMAND_SET_FAILSAFE, [level])
         except KeyboardInterrupt:
             raise
         except:
@@ -631,7 +699,7 @@ Read the current system state of the communications failsafe, True for enabled, 
 The failsafe will turn the motors off unless it is commanded at least once every 1/4 of a second
         """ 
         try:
-            i2cRecv = self.bus.read_i2c_block_data(self.i2cAddress, COMMAND_GET_FAILSAFE, I2C_MAX_LEN)
+            i2cRecv = self.RawRead(COMMAND_GET_FAILSAFE, I2C_MAX_LEN)
         except KeyboardInterrupt:
             raise
         except:
@@ -664,7 +732,7 @@ Note that the fault state may be true at power up, this is normal and should cle
 For more details check the website at www.piborg.org/thunderborg and double check the wiring instructions
         """ 
         try:
-            i2cRecv = self.bus.read_i2c_block_data(self.i2cAddress, COMMAND_GET_DRIVE_A_FAULT, I2C_MAX_LEN)
+            i2cRecv = self.RawRead(COMMAND_GET_DRIVE_A_FAULT, I2C_MAX_LEN)
         except KeyboardInterrupt:
             raise
         except:
@@ -697,7 +765,7 @@ Note that the fault state may be true at power up, this is normal and should cle
 For more details check the website at www.piborg.org/thunderborg and double check the wiring instructions
         """ 
         try:
-            i2cRecv = self.bus.read_i2c_block_data(self.i2cAddress, COMMAND_GET_DRIVE_B_FAULT, I2C_MAX_LEN)
+            i2cRecv = self.RawRead(COMMAND_GET_DRIVE_B_FAULT, I2C_MAX_LEN)
         except KeyboardInterrupt:
             raise
         except:
@@ -718,7 +786,7 @@ Reads the current battery level from the main input.
 Returns the value as a voltage based on the 3.3 V rail as a reference.
         """ 
         try:
-            i2cRecv = self.bus.read_i2c_block_data(self.i2cAddress, COMMAND_GET_BATT_VOLT, I2C_MAX_LEN)
+            i2cRecv = self.RawRead(COMMAND_GET_BATT_VOLT, I2C_MAX_LEN)
         except KeyboardInterrupt:
             raise
         except:
@@ -746,7 +814,7 @@ These values are stored in EEPROM and reloaded when the board is powered.
         levelMax = max(0, min(0xFF, int(levelMax * 0xFF)))
 
         try:
-            self.bus.write_i2c_block_data(self.i2cAddress, COMMAND_SET_BATT_LIMITS, [levelMin, levelMax])
+            self.RawWrite(COMMAND_SET_BATT_LIMITS, [levelMin, levelMax])
             time.sleep(0.2) # Wait for EEPROM write to complete
         except KeyboardInterrupt:
             raise
@@ -763,7 +831,7 @@ The values are between 0 and 36.3 V.
 The colours shown range from full red at minimum or below, yellow half way, and full green at maximum or higher.
         """ 
         try:
-            i2cRecv = self.bus.read_i2c_block_data(self.i2cAddress, COMMAND_GET_BATT_LIMITS, I2C_MAX_LEN)
+            i2cRecv = self.RawRead(COMMAND_GET_BATT_LIMITS, I2C_MAX_LEN)
         except KeyboardInterrupt:
             raise
         except:
@@ -777,6 +845,51 @@ The colours shown range from full red at minimum or below, yellow half way, and 
         levelMin *= VOLTAGE_PIN_MAX
         levelMax *= VOLTAGE_PIN_MAX
         return levelMin, levelMax
+
+
+    def WriteExternalLedWord(self, b0, b1, b2, b3):
+        """
+WriteExternalLedWord(b0, b1, b2, b3)
+
+Low level serial LED word writing.
+Bytes are written MSB first starting from b0
+e.g.
+WriteExtermnalLedWord(255, 64, 1, 0)
+will write out:
+11111111 01000000 00000001 00000000
+to the LEDs.
+        """
+        b0 = max(0, min(PWM_MAX, int(b0)))
+        b1 = max(0, min(PWM_MAX, int(b1)))
+        b2 = max(0, min(PWM_MAX, int(b2)))
+        b3 = max(0, min(PWM_MAX, int(b3)))
+
+        try:
+            self.RawWrite(COMMAND_WRITE_EXTERNAL_LED, [b0, b1, b2, b3])
+        except KeyboardInterrupt:
+            raise
+        except:
+            self.Print('Failed sending word for the external LEDs!')
+
+
+    def SetExternalLedColours(self, colours):
+        """
+SetExternalLedColours([[r, g, b], ..., [r, g, b]])
+
+Takes a set of RGB triples to set each LED to.
+Each call will set all of the LEDs
+e.g.
+SetExternalLedColours([[1.0, 1.0, 0.0]])
+will set a single LED to full yellow.
+SetExternalLedColours([[1.0, 0.0, 0.0], [0.5, 0.0, 0.0], [0.0, 0.0, 0.0]])
+will set LED 1 to full red, LED 2 to half red, and LED 3 to off.
+        """
+        # Send the start marker
+        self.WriteExternalLedWord(0, 0, 0, 0)
+
+        # Send each colour in turn
+        for r, g, b in colours:
+            self.WriteExternalLedWord(255, 255 * b, 255 * g, 255 * r)
 
 
     def Help(self):

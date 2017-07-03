@@ -27,11 +27,13 @@ See the website at www.piborg.org/zeroborg for more details
 """
 
 # Import the libraries we need
-import smbus
+import io
+import fcntl
 import types
 import time
 
 # Constant values
+I2C_SLAVE               = 0x0703
 PWM_MAX                 = 255
 I2C_NORM_LEN            = 4
 I2C_LONG_LEN            = 24
@@ -89,10 +91,11 @@ The busNumber if supplied is which I²C bus to scan, 0 for Rev 1 boards, 1 for Re
     """
     found = []
     print 'Scanning I²C bus #%d' % (busNumber)
-    bus = smbus.SMBus(busNumber)
+    bus = ZeroBorg()
     for address in range(0x03, 0x78, 1):
         try:
-            i2cRecv = bus.read_i2c_block_data(address, COMMAND_GET_ID, I2C_NORM_LEN)
+            bus.InitBusOnly(busNumber, address)
+            i2cRecv = bus.RawRead(COMMAND_GET_ID, I2C_NORM_LEN)
             if len(i2cRecv) == I2C_NORM_LEN:
                 if i2cRecv[1] == I2C_ID_ZEROBORG:
                     print 'Found ZeroBorg at %02X' % (address)
@@ -137,9 +140,10 @@ Warning, this new I²C address will still be used after resetting the power on th
         else:
             oldAddress = found[0]
     print 'Changing I²C address from %02X to %02X (bus #%d)' % (oldAddress, newAddress, busNumber)
-    bus = smbus.SMBus(busNumber)
+    bus = ZeroBorg()
+    bus.InitBusOnly(busNumber, oldAddress)
     try:
-        i2cRecv = bus.read_i2c_block_data(oldAddress, COMMAND_GET_ID, I2C_NORM_LEN)
+        i2cRecv = bus.RawRead(COMMAND_GET_ID, I2C_NORM_LEN)
         if len(i2cRecv) == I2C_NORM_LEN:
             if i2cRecv[1] == I2C_ID_ZEROBORG:
                 foundChip = True
@@ -156,11 +160,12 @@ Warning, this new I²C address will still be used after resetting the power on th
         foundChip = False
         print 'Missing ZeroBorg at %02X' % (oldAddress)
     if foundChip:
-        bus.write_byte_data(oldAddress, COMMAND_SET_I2C_ADD, newAddress)
+        bus.RawWrite(COMMAND_SET_I2C_ADD, [newAddress])
         time.sleep(0.1)
         print 'Address changed to %02X, attempting to talk with the new address' % (newAddress)
         try:
-            i2cRecv = bus.read_i2c_block_data(newAddress, COMMAND_GET_ID, I2C_NORM_LEN)
+            bus.InitBusOnly(busNumber, newAddress)
+            i2cRecv = bus.RawRead(COMMAND_GET_ID, I2C_NORM_LEN)
             if len(i2cRecv) == I2C_NORM_LEN:
                 if i2cRecv[1] == I2C_ID_ZEROBORG:
                     foundChip = True
@@ -197,9 +202,68 @@ printFunction           Function reference to call when printing text, if None "
     # Shared values used by this class
     busNumber               = 1                 # Check here for Rev 1 vs Rev 2 and select the correct bus
     i2cAddress              = I2C_ID_ZEROBORG   # I²C address, override for a different address
-    bus                     = None
     foundChip               = False
     printFunction           = None
+    i2cWrite                = None
+    i2cRead                 = None
+
+
+    def RawWrite(self, command, data):
+        """
+RawWrite(command, data)
+
+Sends a raw command on the I2C bus to the ZeroBorg
+Command codes can be found at the top of ZeroBorg.py, data is a list of 0 or more byte values
+
+Under most circumstances you should use the appropriate function instead of RawWrite
+        """
+        rawOutput = chr(command)
+        for singleByte in data:
+            rawOutput += chr(singleByte)
+        self.i2cWrite.write(rawOutput)
+
+
+    def RawRead(self, command, length, retryCount = 3):
+        """
+RawRead(command, length, [retryCount])
+
+Reads data back from the ZeroBorg after sending a GET command
+Command codes can be found at the top of ZeroBorg.py, length is the number of bytes to read back
+
+The function checks that the first byte read back matches the requested command
+If it does not it will retry the request until retryCount is exhausted (default is 3 times)
+
+Under most circumstances you should use the appropriate function instead of RawRead
+        """
+        while retryCount > 0:
+            self.RawWrite(command, [])
+            rawReply = self.i2cRead.read(length)
+            reply = []
+            for singleByte in rawReply:
+                reply.append(ord(singleByte))
+            if command == reply[0]:
+                break
+            else:
+                retryCount -= 1
+        if retryCount > 0:
+            return reply
+        else:
+            raise IOError('I2C read for command %d failed' % (command))
+
+
+    def InitBusOnly(self, busNumber, address):
+        """
+InitBusOnly(busNumber, address)
+
+Prepare the I2C driver for talking to a ZeroBorg on the specified bus and I2C address
+This call does not check the board is present or working, under most circumstances use Init() instead
+        """
+        self.busNumber = busNumber
+        self.i2cAddress = address
+        self.i2cRead = io.open("/dev/i2c-" + str(self.busNumber), "rb", buffering = 0)
+        fcntl.ioctl(self.i2cRead, I2C_SLAVE, self.i2cAddress)
+        self.i2cWrite = io.open("/dev/i2c-" + str(self.busNumber), "wb", buffering = 0)
+        fcntl.ioctl(self.i2cWrite, I2C_SLAVE, self.i2cAddress)
 
 
     def Print(self, message):
@@ -225,21 +289,26 @@ ZB.printFunction = ZB.NoPrint
         pass
 
 
-    def Init(self, tryOtherBus = True):
+    def Init(self, tryOtherBus = False):
         """
 Init([tryOtherBus])
 
 Prepare the I2C driver for talking to the ZeroBorg
-If tryOtherBus is True or omitted, this function will attempt to use the other bus if the ZeroBorg devices can not be found on the current busNumber
+
+If tryOtherBus is True, this function will attempt to use the other bus if the ThunderBorg devices can not be found on the current busNumber
+    This is only really useful for early Raspberry Pi models!
         """
         self.Print('Loading ZeroBorg on bus %d, address %02X' % (self.busNumber, self.i2cAddress))
 
         # Open the bus
-        self.bus = smbus.SMBus(self.busNumber)
+        self.i2cRead = io.open("/dev/i2c-" + str(self.busNumber), "rb", buffering = 0)
+        fcntl.ioctl(self.i2cRead, I2C_SLAVE, self.i2cAddress)
+        self.i2cWrite = io.open("/dev/i2c-" + str(self.busNumber), "wb", buffering = 0)
+        fcntl.ioctl(self.i2cWrite, I2C_SLAVE, self.i2cAddress)
 
         # Check for ZeroBorg
         try:
-            i2cRecv = self.bus.read_i2c_block_data(self.i2cAddress, COMMAND_GET_ID, I2C_NORM_LEN)
+            i2cRecv = self.RawRead(COMMAND_GET_ID, I2C_NORM_LEN)
             if len(i2cRecv) == I2C_NORM_LEN:
                 if i2cRecv[1] == I2C_ID_ZEROBORG:
                     self.foundChip = True
@@ -298,7 +367,7 @@ SetMotor1(1)     -> motor 1 moving forward at 100% power
                 pwm = PWM_MAX
 
         try:
-            self.bus.write_byte_data(self.i2cAddress, command, pwm)
+            self.RawWrite(command, [pwm])
         except KeyboardInterrupt:
             raise
         except:
@@ -317,7 +386,7 @@ e.g.
 1     -> motor 1 moving forward at 100% power
         """
         try:
-            i2cRecv = self.bus.read_i2c_block_data(self.i2cAddress, COMMAND_GET_A, I2C_NORM_LEN)
+            i2cRecv = self.RawRead(COMMAND_GET_A, I2C_NORM_LEN)
         except KeyboardInterrupt:
             raise
         except:
@@ -359,7 +428,7 @@ SetMotor2(1)     -> motor 2 moving forward at 100% power
                 pwm = PWM_MAX
 
         try:
-            self.bus.write_byte_data(self.i2cAddress, command, pwm)
+            self.RawWrite(command, [pwm])
         except KeyboardInterrupt:
             raise
         except:
@@ -378,7 +447,7 @@ e.g.
 1     -> motor 2 moving forward at 100% power
         """
         try:
-            i2cRecv = self.bus.read_i2c_block_data(self.i2cAddress, COMMAND_GET_B, I2C_NORM_LEN)
+            i2cRecv = self.RawRead(COMMAND_GET_B, I2C_NORM_LEN)
         except KeyboardInterrupt:
             raise
         except:
@@ -420,7 +489,7 @@ SetMotor3(1)     -> motor 3 moving forward at 100% power
                 pwm = PWM_MAX
 
         try:
-            self.bus.write_byte_data(self.i2cAddress, command, pwm)
+            self.RawWrite(command, [pwm])
         except KeyboardInterrupt:
             raise
         except:
@@ -439,7 +508,7 @@ e.g.
 1     -> motor 3 moving forward at 100% power
         """
         try:
-            i2cRecv = self.bus.read_i2c_block_data(self.i2cAddress, COMMAND_GET_C, I2C_NORM_LEN)
+            i2cRecv = self.RawRead(COMMAND_GET_C, I2C_NORM_LEN)
         except KeyboardInterrupt:
             raise
         except:
@@ -481,7 +550,7 @@ SetMotor4(1)     -> motor 4 moving forward at 100% power
                 pwm = PWM_MAX
 
         try:
-            self.bus.write_byte_data(self.i2cAddress, command, pwm)
+            self.RawWrite(command, [pwm])
         except KeyboardInterrupt:
             raise
         except:
@@ -500,7 +569,7 @@ e.g.
 1     -> motor 4 moving forward at 100% power
         """
         try:
-            i2cRecv = self.bus.read_i2c_block_data(self.i2cAddress, COMMAND_GET_D, I2C_NORM_LEN)
+            i2cRecv = self.RawRead(COMMAND_GET_D, I2C_NORM_LEN)
         except KeyboardInterrupt:
             raise
         except:
@@ -542,7 +611,7 @@ SetMotors(1)     -> all motors are moving forward at 100% power
                 pwm = PWM_MAX
 
         try:
-            self.bus.write_byte_data(self.i2cAddress, command, pwm)
+            self.RawWrite(command, [pwm])
         except KeyboardInterrupt:
             raise
         except:
@@ -556,7 +625,7 @@ MotorsOff()
 Sets all motors to stopped, useful when ending a program
         """
         try:
-            self.bus.write_byte_data(self.i2cAddress, COMMAND_ALL_OFF, 0)
+            self.RawWrite(COMMAND_ALL_OFF, [0])
         except KeyboardInterrupt:
             raise
         except:
@@ -575,7 +644,7 @@ Sets the current state of the LED, False for off, True for on
             level = COMMAND_VALUE_OFF
 
         try:
-            self.bus.write_byte_data(self.i2cAddress, COMMAND_SET_LED, level)
+            self.RawWrite(COMMAND_SET_LED, [level])
         except KeyboardInterrupt:
             raise
         except:
@@ -589,7 +658,7 @@ state = GetLed()
 Reads the current state of the LED, False for off, True for on
         """ 
         try:
-            i2cRecv = self.bus.read_i2c_block_data(self.i2cAddress, COMMAND_GET_LED, I2C_NORM_LEN)
+            i2cRecv = self.RawRead(COMMAND_GET_LED, I2C_NORM_LEN)
         except KeyboardInterrupt:
             raise
         except:
@@ -609,7 +678,7 @@ ResetEpo()
 Resets the EPO latch state, use to allow movement again after the EPO has been tripped
         """
         try:
-            self.bus.write_byte_data(self.i2cAddress, COMMAND_RESET_EPO, 0)
+            self.RawWrite(COMMAND_RESET_EPO, [0])
         except KeyboardInterrupt:
             raise
         except:
@@ -626,7 +695,7 @@ If True the EPO has been tripped, movement is disabled if the EPO is not ignored
     Movement can be re-enabled by calling ResetEpo.
         """ 
         try:
-            i2cRecv = self.bus.read_i2c_block_data(self.i2cAddress, COMMAND_GET_EPO, I2C_NORM_LEN)
+            i2cRecv = self.RawRead(COMMAND_GET_EPO, I2C_NORM_LEN)
         except KeyboardInterrupt:
             raise
         except:
@@ -651,7 +720,7 @@ Sets the system to ignore or use the EPO latch, set to False if you have an EPO 
             level = COMMAND_VALUE_OFF
 
         try:
-            self.bus.write_byte_data(self.i2cAddress, COMMAND_SET_EPO_IGNORE, level)
+            self.RawWrite(COMMAND_SET_EPO_IGNORE, [level])
         except KeyboardInterrupt:
             raise
         except:
@@ -665,7 +734,7 @@ state = GetEpoIgnore()
 Reads the system EPO ignore state, False for using the EPO latch, True for ignoring the EPO latch
         """ 
         try:
-            i2cRecv = self.bus.read_i2c_block_data(self.i2cAddress, COMMAND_GET_EPO_IGNORE, I2C_NORM_LEN)
+            i2cRecv = self.RawRead(COMMAND_GET_EPO_IGNORE, I2C_NORM_LEN)
         except KeyboardInterrupt:
             raise
         except:
@@ -687,7 +756,7 @@ If False there has been no messages to the IR sensor since the last read.
 If True there has been a new IR message which can be read using GetIrMessage().
         """ 
         try:
-            i2cRecv = self.bus.read_i2c_block_data(self.i2cAddress, COMMAND_GET_NEW_IR, I2C_NORM_LEN)
+            i2cRecv = self.RawRead(COMMAND_GET_NEW_IR, I2C_NORM_LEN)
         except KeyboardInterrupt:
             raise
         except:
@@ -709,7 +778,7 @@ Returns the bytes from the remote control as a hexadecimal string, e.g. 'F75AD5A
 Use HasNewIrMessage() to see if there has been a new IR message since the last call.
         """ 
         try:
-            i2cRecv = self.bus.read_i2c_block_data(self.i2cAddress, COMMAND_GET_LAST_IR, I2C_LONG_LEN)
+            i2cRecv = self.RawRead(COMMAND_GET_LAST_IR, I2C_LONG_LEN)
         except KeyboardInterrupt:
             raise
         except:
@@ -734,7 +803,7 @@ Sets if IR messages control the state of the LED, False for no effect, True for 
             level = COMMAND_VALUE_OFF
 
         try:
-            self.bus.write_byte_data(self.i2cAddress, COMMAND_SET_LED_IR, level)
+            self.RawWrite(COMMAND_SET_LED_IR, [level])
         except KeyboardInterrupt:
             raise
         except:
@@ -748,7 +817,7 @@ state = GetLedIr()
 Reads if IR messages control the state of the LED, False for no effect, True for incoming messages blink the LED
         """ 
         try:
-            i2cRecv = self.bus.read_i2c_block_data(self.i2cAddress, COMMAND_GET_LED_IR, I2C_NORM_LEN)
+            i2cRecv = self.RawRead(COMMAND_GET_LED_IR, I2C_NORM_LEN)
         except KeyboardInterrupt:
             raise
         except:
@@ -769,7 +838,7 @@ Reads the current analog level from port #1 (pin 2).
 Returns the value as a voltage based on the 3.3 V reference pin (pin 1).
         """ 
         try:
-            i2cRecv = self.bus.read_i2c_block_data(self.i2cAddress, COMMAND_GET_ANALOG_1, I2C_NORM_LEN)
+            i2cRecv = self.RawRead(COMMAND_GET_ANALOG_1, I2C_NORM_LEN)
         except KeyboardInterrupt:
             raise
         except:
@@ -789,7 +858,7 @@ Reads the current analog level from port #2 (pin 4).
 Returns the value as a voltage based on the 3.3 V reference pin (pin 1).
         """ 
         try:
-            i2cRecv = self.bus.read_i2c_block_data(self.i2cAddress, COMMAND_GET_ANALOG_2, I2C_NORM_LEN)
+            i2cRecv = self.RawRead(COMMAND_GET_ANALOG_2, I2C_NORM_LEN)
         except KeyboardInterrupt:
             raise
         except:
@@ -816,7 +885,7 @@ The failsafe is disabled at power on
             level = COMMAND_VALUE_OFF
 
         try:
-            self.bus.write_byte_data(self.i2cAddress, COMMAND_SET_FAILSAFE, level)
+            self.RawWrite(COMMAND_SET_FAILSAFE, [level])
         except KeyboardInterrupt:
             raise
         except:
@@ -831,7 +900,7 @@ Read the current system state of the communications failsafe, True for enabled, 
 The failsafe will turn the motors off unless it is commanded at least once every 1/4 of a second
         """ 
         try:
-            i2cRecv = self.bus.read_i2c_block_data(self.i2cAddress, COMMAND_GET_FAILSAFE, I2C_NORM_LEN)
+            i2cRecv = self.RawRead(COMMAND_GET_FAILSAFE, I2C_NORM_LEN)
         except KeyboardInterrupt:
             raise
         except:
