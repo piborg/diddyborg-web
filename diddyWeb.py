@@ -170,7 +170,7 @@ class WebServer(SocketServer.BaseRequestHandler):
             lockFrame.acquire()
             sendFrame = lastFrame
             lockFrame.release()
-            if sendFrame != None:
+            if sendFrame is not None:
                 self.send(sendFrame.tostring())
         elif getPath.startswith('/off'):
             # Turn the drives off
@@ -222,7 +222,7 @@ class WebServer(SocketServer.BaseRequestHandler):
             captureFrame = lastFrame
             lockFrame.release()
             httpText = '<html><body><center>'
-            if captureFrame != None:
+            if captureFrame is not None:
                 photoName = '%s/Photo %s.jpg' % (photoDirectory, datetime.datetime.utcnow())
                 try:
                     photoFile = open(photoName, 'wb')
