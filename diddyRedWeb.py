@@ -44,7 +44,7 @@ if not PBR.foundChip:
         print 'No PicoBorg Reverse at address %02X, but we did find boards:' % (PBR.i2cAddress)
         for board in boards:
             print '    %02X (%d)' % (board, board)
-        print 'If you need to change the I²C address change the setup line so it is correct, e.g.'
+        print 'If you need to change the IÂ²C address change the setup line so it is correct, e.g.'
         print 'PBR.i2cAddress = 0x%02X' % (boards[0])
     sys.exit()
 #PBR.SetEpoIgnore(True)                 # Uncomment to disable EPO latch, needed if you do not have a switch / jumper
@@ -298,6 +298,80 @@ class WebServer(SocketServer.BaseRequestHandler):
             httpText += ' var iframe = document.getElementById("setDrive");\n'
             httpText += ' iframe.src = "/photo";\n'
             httpText += '}\n'
+            # key management ------------------------------------------------
+            # 38=UP 40=DOWN 37=LEFT 39=RIGHT
+            httpText += 'var valLeft = 0;\n'
+            httpText += 'var valRight = 0;\n'
+            httpText += 'function checkKey() {\n'
+            httpText += 'valLeft = 0;\n'
+            httpText += 'valRight = 0;\n'
+            #UP
+            httpText += '  if (map[38]) {\n'
+            httpText += '      valLeft = 1;\n'
+            httpText += '      valRight = 1;\n'
+            httpText += '  }\n'
+            #DOWN
+            httpText += '  if (map[40]) {\n'
+            httpText += '      valLeft = -1;\n'
+            httpText += '      valRight = -1;\n'
+            httpText += '  }\n'
+            #LEFT
+            httpText += '  if (map[37]) {\n'
+            httpText += '      valLeft = -1;\n'
+            httpText += '      valRight = 1;\n'
+            httpText += '  }\n'
+            #RIGHT
+            httpText += '  if (map[39]) {\n'
+            httpText += '      valLeft = 1;\n'
+            httpText += '      valRight = -1;\n'
+            httpText += '  }\n'
+            #UP LEFT
+            httpText += '  if (map[38] && map[37] ) {\n'
+            httpText += '      valLeft = 0.1;\n'
+            httpText += '      valRight = 1;\n'
+            httpText += '  }\n'
+            #UP RIGHT
+            httpText += '  if (map[38] && map[39] ) {\n'
+            httpText += '      valLeft = 1;\n'
+            httpText += '      valRight = 0.1;\n'
+            httpText += '  }\n'
+            #UP DOWN
+            httpText += '  if (map[38] && map[40] ) {\n'
+            httpText += '      valLeft = 0;\n'
+            httpText += '      valRight = 0;\n'
+            httpText += '  }\n'
+            #DOWN LEFT
+            httpText += '  if (map[40] && map[37] ) {\n'
+            httpText += '      valLeft = -0.1;\n'
+            httpText += '      valRight = -1;\n'
+            httpText += '  }\n'
+            #DOWN RIGHT
+            httpText += '  if (map[40] && map[39] ) {\n'
+            httpText += '      valLeft = -1;\n'
+            httpText += '      valRight = -0.1;\n'
+            httpText += '  }\n'
+            #ACTION
+            httpText += '  if (valLeft == 0 && valRight == 0) {\n'
+            httpText += '      Off();\n'
+            httpText += '  }\n'
+            httpText += '  else {\n'
+            httpText += '      Drive(valLeft,valRight);\n'
+            httpText += '  }\n'
+            httpText += '}\n'
+            httpText += 'var map = {38: false, 40: false, 37: false, 39: false};\n'
+            httpText += 'onkeydown = (function(e) {\n'
+            httpText += ' if (e.keyCode in map) {\n'
+            httpText += '  map[e.keyCode] = true;\n'
+            httpText += ' checkKey()\n'
+            httpText += ' }\n'
+            httpText += '})\n'
+            httpText += 'onkeyup = (function(e) {\n'
+            httpText += ' if (e.keyCode in map) {\n'
+            httpText += '  map[e.keyCode] = false;\n'
+            httpText += ' checkKey()\n'
+            httpText += ' }\n'
+            httpText += '});\n'
+            # ---------------------------------------------------------------
             httpText += '//--></script>\n'
             httpText += '</head>\n'
             httpText += '<body>\n'
