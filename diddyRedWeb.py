@@ -44,7 +44,7 @@ if not PBR.foundChip:
         print 'No PicoBorg Reverse at address %02X, but we did find boards:' % (PBR.i2cAddress)
         for board in boards:
             print '    %02X (%d)' % (board, board)
-        print 'If you need to change the I²C address change the setup line so it is correct, e.g.'
+        print 'If you need to change the IÂ²C address change the setup line so it is correct, e.g.'
         print 'PBR.i2cAddress = 0x%02X' % (boards[0])
     sys.exit()
 #PBR.SetEpoIgnore(True)                 # Uncomment to disable EPO latch, needed if you do not have a switch / jumper
@@ -298,6 +298,80 @@ class WebServer(SocketServer.BaseRequestHandler):
             httpText += ' var iframe = document.getElementById("setDrive");\n'
             httpText += ' iframe.src = "/photo";\n'
             httpText += '}\n'
+            # key management ------------------------------------------------
+            # 38=UP 40=DOWN 37=LEFT 39=RIGHT
+            httpText += 'var valLeft = 0;\n'
+            httpText += 'var valRight = 0;\n'
+            httpText += 'function checkKey() {\n'
+            httpText += 'valLeft = 0;\n'
+            httpText += 'valRight = 0;\n'
+            #UP
+            httpText += '  if (map[38]) {\n'
+            httpText += '      valLeft = 1;\n'
+            httpText += '      valRight = 1;\n'
+            httpText += '  }\n'
+            #DOWN
+            httpText += '  if (map[40]) {\n'
+            httpText += '      valLeft = -1;\n'
+            httpText += '      valRight = -1;\n'
+            httpText += '  }\n'
+            #LEFT
+            httpText += '  if (map[37]) {\n'
+            httpText += '      valLeft = -1;\n'
+            httpText += '      valRight = 1;\n'
+            httpText += '  }\n'
+            #RIGHT
+            httpText += '  if (map[39]) {\n'
+            httpText += '      valLeft = 1;\n'
+            httpText += '      valRight = -1;\n'
+            httpText += '  }\n'
+            #UP LEFT
+            httpText += '  if (map[38] && map[37] ) {\n'
+            httpText += '      valLeft = 0.1;\n'
+            httpText += '      valRight = 1;\n'
+            httpText += '  }\n'
+            #UP RIGHT
+            httpText += '  if (map[38] && map[39] ) {\n'
+            httpText += '      valLeft = 1;\n'
+            httpText += '      valRight = 0.1;\n'
+            httpText += '  }\n'
+            #UP DOWN
+            httpText += '  if (map[38] && map[40] ) {\n'
+            httpText += '      valLeft = 0;\n'
+            httpText += '      valRight = 0;\n'
+            httpText += '  }\n'
+            #DOWN LEFT
+            httpText += '  if (map[40] && map[37] ) {\n'
+            httpText += '      valLeft = -0.1;\n'
+            httpText += '      valRight = -1;\n'
+            httpText += '  }\n'
+            #DOWN RIGHT
+            httpText += '  if (map[40] && map[39] ) {\n'
+            httpText += '      valLeft = -1;\n'
+            httpText += '      valRight = -0.1;\n'
+            httpText += '  }\n'
+            #ACTION
+            httpText += '  if (valLeft == 0 && valRight == 0) {\n'
+            httpText += '      Off();\n'
+            httpText += '  }\n'
+            httpText += '  else {\n'
+            httpText += '      Drive(valLeft,valRight);\n'
+            httpText += '  }\n'
+            httpText += '}\n'
+            httpText += 'var map = {38: false, 40: false, 37: false, 39: false};\n'
+            httpText += 'onkeydown = (function(e) {\n'
+            httpText += ' if (e.keyCode in map) {\n'
+            httpText += '  map[e.keyCode] = true;\n'
+            httpText += ' checkKey()\n'
+            httpText += ' }\n'
+            httpText += '})\n'
+            httpText += 'onkeyup = (function(e) {\n'
+            httpText += ' if (e.keyCode in map) {\n'
+            httpText += '  map[e.keyCode] = false;\n'
+            httpText += ' checkKey()\n'
+            httpText += ' }\n'
+            httpText += '});\n'
+            # ---------------------------------------------------------------
             httpText += '//--></script>\n'
             httpText += '</head>\n'
             httpText += '<body>\n'
@@ -319,6 +393,47 @@ class WebServer(SocketServer.BaseRequestHandler):
             httpText += '</body>\n'
             httpText += '</html>\n'
             self.send(httpText)
+         elif getPath == '/touch':
+            # Alternate page, touch hold buttons to move (does not work with all devices)
+            httpText = '<html>\n'
+            httpText += '<head>\n'
+            httpText += '<script language="JavaScript"><!--\n'
+            httpText += 'function Drive(left, right) {\n'
+            httpText += ' var iframe = document.getElementById("setDrive");\n'
+            httpText += ' var slider = document.getElementById("speed");\n'
+            httpText += ' left *= speed.value / 100.0;'
+            httpText += ' right *= speed.value / 100.0;'
+            httpText += ' iframe.src = "/set/" + left + "/" + right;\n'
+            httpText += '}\n'
+            httpText += 'function Off() {\n'
+            httpText += ' var iframe = document.getElementById("setDrive");\n'
+            httpText += ' iframe.src = "/off";\n'
+            httpText += '}\n'
+            httpText += 'function Photo() {\n'
+            httpText += ' var iframe = document.getElementById("setDrive");\n'
+            httpText += ' iframe.src = "/photo";\n'
+            httpText += '}\n'
+            httpText += '//--></script>\n'
+            httpText += '</head>\n'
+            httpText += '<body>\n'
+            httpText += '<iframe src="/stream" width="100%" height="500" frameborder="0"></iframe>\n'
+            httpText += '<iframe id="setDrive" src="/off" width="100%" height="50" frameborder="0"></iframe>\n'
+            httpText += '<center>\n'
+            httpText += '<button ontouchstart="Drive(-1,1)" ontouchend="Off()" style="width:200px;height:100px;"><b>Spin Left</b></button>\n'
+            httpText += '<button ontouchstart="Drive(1,1)" ontouchend="Off()" style="width:200px;height:100px;"><b>Forward</b></button>\n'
+            httpText += '<button ontouchstart="Drive(1,-1)" ontouchend="Off()" style="width:200px;height:100px;"><b>Spin Right</b></button>\n'
+            httpText += '<br /><br />\n'
+            httpText += '<button ontouchstart="Drive(0,1)" ontouchend="Off()" style="width:200px;height:100px;"><b>Turn Left</b></button>\n'
+            httpText += '<button ontouchstart="Drive(-1,-1)" ontouchend="Off()" style="width:200px;height:100px;"><b>Reverse</b></button>\n'
+            httpText += '<button ontouchstart="Drive(1,0)" ontouchend="Off()" style="width:200px;height:100px;"><b>Turn Right</b></button>\n'
+            httpText += '<br /><br />\n'
+            httpText += '<button onclick="Photo()" style="width:200px;height:100px;"><b>Save Photo</b></button>\n'
+            httpText += '<br /><br />\n'
+            httpText += '<input id="speed" type="range" min="0" max="100" value="100" style="width:600px" />\n'
+            httpText += '</center>\n'
+            httpText += '</body>\n'
+            httpText += '</html>\n'
+            self.send(httpText)	    
         elif getPath == '/stream':
             # Streaming frame, set a delayed refresh
             displayDelay = int(1000 / displayRate)

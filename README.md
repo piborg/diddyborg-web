@@ -48,7 +48,7 @@ We will need this to access the controls, so make a note of it.
 
 Next run the script for your robot:
 * MonsterBorg → `sudo ~/diddyborg-web/monsterWeb.py`
-* DiddyBorg Metal Edition → `sudo ~/diddyborg-web/metalWeb.py`
+* DiddyBorg Metal Edition → `sudo ~/diddyborg-web/metalWeb.py` or `sudo ~/diddyborg-web/metalWebv2.py`
 * DiddyBorg Red Edition → `sudo ~/diddyborg-web/diddyRedWeb.py`
 * DiddyBorg → `sudo ~/diddyborg-web/diddyWeb.py`
 * 4Borg → `sudo ~/diddyborg-web/4BorgWeb.py`
@@ -81,7 +81,8 @@ The last motor settings are displayed below the image.
 There are some other URLs you can use to get different functionality.
 Replace `192.168.0.198` in the below addresses with your IP address:
 * http://192.168.0.198 - Standard controls, click to change speed
-* http://192.168.0.198/hold - Press and hold controls, may not work on all devices
+* http://192.168.0.198/hold - Press and hold controls, may not work on all devices - also control using arrow keys on keyboard
+* http://192/168.0.198/touch - Works on phones and tablets
 * http://192.168.0.198/stream - Gets the video stream without any controls
 * http://192.168.0.198/cam.jpg - Single frame from the camera, you may need to force-refresh to get a new image
 
@@ -118,3 +119,10 @@ The cron table should now auto-run the script when the Raspberry Pi boots up.
 This is just a simple example of how a web interface can be made using Python on the Raspberry Pi to control a robot.
 
 We think sharing software is awesome, so we encourage others to extend and/or improve on this script to make it do even more :)
+
+## Recent improvements
+Thanks go to gt213296's post on http://forum.piborg.org/comment/4090 for Ultraborg information and for Semi-Auto and Auto mode additions
+
+Thanks go to WS at http://forum.piborg.org/thunderborg/examples/users for /touch mode, keyboard control for /hold mode and jpeg quality settings
+
+Above changes ready to be pulled into main fork from wingers999 :)
