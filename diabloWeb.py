@@ -213,8 +213,8 @@ class WebServer(SocketServer.BaseRequestHandler):
             # Set the outputs
             driveLeft *= maxPower
             driveRight *= maxPower
-            DIABLO.SetMotor1(driveRight)
-            DIABLO.SetMotor2(-driveLeft)
+            DIABLO.SetMotor1(driveLeft)
+            DIABLO.SetMotor2(driveRight)
         elif getPath.startswith('/photo'):
             # Save camera photo
             lockFrame.acquire()
