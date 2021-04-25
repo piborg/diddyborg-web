@@ -393,7 +393,7 @@ class WebServer(SocketServer.BaseRequestHandler):
             httpText += '</body>\n'
             httpText += '</html>\n'
             self.send(httpText)
-         elif getPath == '/touch':
+        elif getPath == '/touch':
             # Alternate page, touch hold buttons to move (does not work with all devices)
             httpText = '<html>\n'
             httpText += '<head>\n'
