@@ -39,7 +39,7 @@ PBR.Init()
 if not PBR.foundChip:
     boards = PicoBorgRev.ScanForPicoBorgReverse()
     if len(boards) == 0:
-        print 'No PicoBorg Reverse found, check you are attached :)'
+        print ('No PicoBorg Reverse found, check you are attached :)')
     else:
         print 'No PicoBorg Reverse at address %02X, but we did find boards:' % (PBR.i2cAddress)
         for board in boards:
