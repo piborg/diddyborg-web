@@ -8,7 +8,7 @@ import ZeroBorg
 import time
 import sys
 import threading
-import SocketServer
+import socketserver
 import picamera
 import picamera.array
 import cv2
@@ -39,13 +39,13 @@ ZB.Init()
 if not ZB.foundChip:
     boards = ZeroBorg.ScanForZeroBorg()
     if len(boards) == 0:
-        print 'No ZeroBorg found, check you are attached :)'
+        print('No ZeroBorg found, check you are attached :)')
     else:
-        print 'No ZeroBorg at address %02X, but we did find boards:' % (ZB.i2cAddress)
+        print(('No ZeroBorg at address %02X, but we did find boards:' % (ZB.i2cAddress)))
         for board in boards:
-            print '    %02X (%d)' % (board, board)
-        print 'If you need to change the I²C address change the setup line so it is correct, e.g.'
-        print 'ZB.i2cAddress = 0x%02X' % (boards[0])
+            print(('    %02X (%d)' % (board, board)))
+        print('If you need to change the I²C address change the setup line so it is correct, e.g.')
+        print(('ZB.i2cAddress = 0x%02X' % (boards[0])))
     sys.exit()
 #ZB.SetEpoIgnore(True)                 # Uncomment to disable EPO latch, needed if you do not have a switch / jumper
 ZB.SetCommsFailsafe(False)
@@ -79,7 +79,7 @@ class Watchdog(threading.Thread):
             if timedOut:
                 if self.event.wait(1):
                     # Connection
-                    print 'Reconnected...'
+                    print('Reconnected...')
                     timedOut = False
                     self.event.clear()
             else:
@@ -87,7 +87,7 @@ class Watchdog(threading.Thread):
                     self.event.clear()
                 else:
                     # Timed out
-                    print 'Timed out...'
+                    print('Timed out...')
                     timedOut = True
                     ZB.MotorsOff()
 
@@ -132,12 +132,12 @@ class ImageCapture(threading.Thread):
     def run(self):
         global camera
         global processor
-        print 'Start the stream using the video port'
+        print('Start the stream using the video port')
         camera.capture_sequence(self.TriggerStream(), format='bgr', use_video_port=True)
-        print 'Terminating camera processing...'
+        print('Terminating camera processing...')
         processor.terminated = True
         processor.join()
-        print 'Processing terminated.'
+        print('Processing terminated.')
 
     # Stream delegation loop
     def TriggerStream(self):
@@ -150,7 +150,7 @@ class ImageCapture(threading.Thread):
                 processor.event.set()
 
 # Class used to implement the web server
-class WebServer(SocketServer.BaseRequestHandler):
+class WebServer(socketserver.BaseRequestHandler):
     def handle(self):
         global ZB
         global lastFrame
@@ -353,34 +353,34 @@ lastFrame = None
 lockFrame = threading.Lock()
 
 # Startup sequence
-print 'Setup camera'
+print('Setup camera')
 camera = picamera.PiCamera()
 camera.resolution = (imageWidth, imageHeight)
 camera.framerate = frameRate
 
-print 'Setup the stream processing thread'
+print('Setup the stream processing thread')
 processor = StreamProcessor()
 
-print 'Wait ...'
+print('Wait ...')
 time.sleep(2)
 captureThread = ImageCapture()
 
-print 'Setup the watchdog'
+print('Setup the watchdog')
 watchdog = Watchdog()
 
 # Run the web server until we are told to close
-httpServer = SocketServer.TCPServer(("0.0.0.0", webPort), WebServer)
+httpServer = socketserver.TCPServer(("0.0.0.0", webPort), WebServer)
 try:
-    print 'Press CTRL+C to terminate the web-server'
+    print('Press CTRL+C to terminate the web-server')
     while running:
         httpServer.handle_request()
 except KeyboardInterrupt:
     # CTRL+C exit
-    print '\nUser shutdown'
+    print('\nUser shutdown')
 finally:
     # Turn the motors off under all scenarios
     ZB.MotorsOff()
-    print 'Motors off'
+    print('Motors off')
 # Tell each thread to stop, and wait for them to end
 running = False
 captureThread.join()
@@ -390,4 +390,4 @@ processor.join()
 watchdog.join()
 del camera
 ZB.SetLed(True)
-print 'Web-server terminated.'
+print('Web-server terminated.')
