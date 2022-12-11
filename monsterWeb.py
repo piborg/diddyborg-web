@@ -8,7 +8,7 @@ import ThunderBorg
 import time
 import sys
 import threading
-import SocketServer
+import socketserver
 import picamera
 import picamera.array
 import cv2
@@ -40,13 +40,13 @@ TB.Init()
 if not TB.foundChip:
     boards = ThunderBorg.ScanForThunderBorg()
     if len(boards) == 0:
-        print 'No ThunderBorg found, check you are attached :)'
+        print('No ThunderBorg found, check you are attached :)')
     else:
-        print 'No ThunderBorg at address %02X, but we did find boards:' % (TB.i2cAddress)
+        print(('No ThunderBorg at address %02X, but we did find boards:' % (TB.i2cAddress)))
         for board in boards:
-            print '    %02X (%d)' % (board, board)
-        print 'If you need to change the I²C address change the setup line so it is correct, e.g.'
-        print 'TB.i2cAddress = 0x%02X' % (boards[0])
+            print(('    %02X (%d)' % (board, board)))
+        print('If you need to change the I²C address change the setup line so it is correct, e.g.')
+        print(('TB.i2cAddress = 0x%02X' % (boards[0])))
     sys.exit()
 TB.SetCommsFailsafe(False)
 TB.SetLedShowBattery(False)
@@ -79,7 +79,7 @@ class Watchdog(threading.Thread):
             if timedOut:
                 if self.event.wait(1):
                     # Connection
-                    print 'Reconnected...'
+                    print('Reconnected...')
                     TB.SetLedShowBattery(True)
                     timedOut = False
                     self.event.clear()
@@ -88,7 +88,7 @@ class Watchdog(threading.Thread):
                     self.event.clear()
                 else:
                     # Timed out
-                    print 'Timed out...'
+                    print('Timed out...')
                     TB.SetLedShowBattery(False)
                     TB.SetLeds(0,0,1)
                     timedOut = True
@@ -138,12 +138,12 @@ class ImageCapture(threading.Thread):
     def run(self):
         global camera
         global processor
-        print 'Start the stream using the video port'
+        print('Start the stream using the video port')
         camera.capture_sequence(self.TriggerStream(), format='bgr', use_video_port=True)
-        print 'Terminating camera processing...'
+        print('Terminating camera processing...')
         processor.terminated = True
         processor.join()
-        print 'Processing terminated.'
+        print('Processing terminated.')
 
     # Stream delegation loop
     def TriggerStream(self):
@@ -156,7 +156,7 @@ class ImageCapture(threading.Thread):
                 processor.event.set()
 
 # Class used to implement the web server
-class WebServer(SocketServer.BaseRequestHandler):
+class WebServer(socketserver.BaseRequestHandler):
     def handle(self):
         global TB
         global lastFrame
@@ -472,46 +472,46 @@ lastFrame = None
 lockFrame = threading.Lock()
 
 # Startup sequence
-print 'Setup camera'
+print('Setup camera')
 camera = picamera.PiCamera()
 camera.resolution = (imageWidth, imageHeight)
 camera.framerate = frameRate
 
-print 'Setup the stream processing thread'
+print('Setup the stream processing thread')
 processor = StreamProcessor()
 
-print 'Wait ...'
+print('Wait ...')
 time.sleep(2)
 captureThread = ImageCapture()
 
-print 'Setup the watchdog'
+print('Setup the watchdog')
 watchdog = Watchdog()
 
 # Run the web server until we are told to close
 try:
     httpServer = None
-    httpServer = SocketServer.TCPServer(("0.0.0.0", webPort), WebServer)
+    httpServer = socketserver.TCPServer(("0.0.0.0", webPort), WebServer)
 except:
     # Failed to open the port, report common issues
-    print
-    print 'Failed to open port %d' % (webPort)
-    print 'Make sure you are running the script with sudo permissions'
-    print 'Other problems include running another script with the same port'
-    print 'If the script was just working recently try waiting a minute first'
-    print 
+    print()
+    print(('Failed to open port %d' % (webPort)))
+    print('Make sure you are running the script with sudo permissions')
+    print('Other problems include running another script with the same port')
+    print('If the script was just working recently try waiting a minute first')
+    print() 
     # Flag the script to exit
     running = False
 try:
-    print 'Press CTRL+C to terminate the web-server'
+    print('Press CTRL+C to terminate the web-server')
     while running:
         httpServer.handle_request()
 except KeyboardInterrupt:
     # CTRL+C exit
-    print '\nUser shutdown'
+    print('\nUser shutdown')
 finally:
     # Turn the motors off under all scenarios
     TB.MotorsOff()
-    print 'Motors off'
+    print('Motors off')
 # Tell each thread to stop, and wait for them to end
 if httpServer != None:
     httpServer.server_close()
@@ -525,6 +525,6 @@ del camera
 TB.SetLedShowBattery(False)
 TB.SetLeds(0,0,0)
 TB.MotorsOff()
-print 'Web-server terminated.'
+print('Web-server terminated.')
 
 
